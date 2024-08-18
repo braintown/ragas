@@ -162,7 +162,7 @@ class ContextRecall(MetricWithLLM):
 
         return score
 
-    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
+    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> t.Dict:
         assert self.llm is not None, "set LLM before use"
         p_value = self._create_context_recall_prompt(row)
         results = await self.llm.generate(
@@ -183,8 +183,10 @@ class ContextRecall(MetricWithLLM):
 
         answers = ensembler.from_discrete(answers, "attributed")
         answers = ContextRecallClassificationAnswers.parse_obj(answers)
+        answer = [answer.dict() for answer in answers.__root__]
+        score = self._compute_score(answers)
 
-        return self._compute_score(answers)
+        return {"context_recall_list": answer, "scores": score}
 
     def adapt(self, language: str, cache_dir: str | None = None) -> None:
         assert self.llm is not None, "set LLM before use"

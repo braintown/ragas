@@ -145,7 +145,7 @@ class AnswerRelevancy(MetricWithLLM, MetricWithEmbeddings):
         ans, ctx = row["answer"], row["contexts"]
         return self.question_generation.format(answer=ans, context="\n".join(ctx))
 
-    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
+    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> t.Dict:
         assert self.llm is not None, "LLM is not set"
 
         prompt = self._create_question_gen_prompt(row)
@@ -163,7 +163,11 @@ class AnswerRelevancy(MetricWithLLM, MetricWithEmbeddings):
             return np.nan
 
         answers = [answer for answer in answers if answer is not None]
-        return self._calculate_score(answers, row)
+        scores = self._calculate_score(answers, row)
+        answers = [answer.dict() for answer in answers]
+        # print({"answer_relevancy_list": answers, "result_scores": scores})
+        return {"answer_relevancy_list": answers, "scores": scores}
+        # return self._calculate_score(answers, row)
 
     def adapt(self, language: str, cache_dir: str | None = None) -> None:
         assert self.llm is not None, "LLM is not set"

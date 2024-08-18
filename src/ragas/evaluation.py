@@ -265,7 +265,25 @@ def evaluate(
         for i, _ in enumerate(dataset):
             s = {}
             for j, m in enumerate(metrics):
-                s[m.name] = results[len(metrics) * i + j]
+                result = results[len(metrics) * i + j]
+                if m.name == "faithfulness":
+                    s[f"{m.name}_list"] = result["faithfulness_list"]
+                    s[f"{m.name}_scores"] = result["scores"]
+                elif m.name == "answer_correctness":
+                    s[f"{m.name}_list"] = result["answer_correctness_list"]
+                    s[f"{m.name}_scores"] = result["scores"]
+                elif m.name == "answer_relevancy":
+                    s[f"{m.name}_list"] = result["answer_relevancy_list"]
+                    s[f"{m.name}_scores"] = result["scores"]
+                elif m.name == "context_precision":
+                    s[f"{m.name}_list"] = result["context_precision_list"]
+                    s[f"{m.name}_scores"] = result["scores"]
+                elif m.name == "context_recall":
+                    s[f"{m.name}_list"] = result["context_recall_list"]
+                    s[f"{m.name}_scores"] = result["scores"]
+
+                else:
+                    s[m.name] = result
             scores.append(s)
             # close the row chain
             row_rm, row_group_cm = row_run_managers[i]
@@ -332,13 +350,8 @@ class Result(dict):
     cost_cb: t.Optional[CostCallbackHandler] = None
 
     def __post_init__(self):
-        values = []
         for cn in self.scores[0].keys():
-            value = safe_nanmean(self.scores[cn])
-            self[cn] = value
-            if cn not in self.binary_columns:
-                value = t.cast(float, value)
-                values.append(value + 1e-10)
+            self[cn] = self.scores[cn]
 
     def to_pandas(self, batch_size: int | None = None, batched: bool = False):
         if self.dataset is None:
@@ -370,6 +383,4 @@ class Result(dict):
         )
 
     def __repr__(self) -> str:
-        scores = self.copy()
-        score_strs = [f"'{k}': {v:0.4f}" for k, v in scores.items()]
-        return "{" + ", ".join(score_strs) + "}"
+        return super().__repr__()

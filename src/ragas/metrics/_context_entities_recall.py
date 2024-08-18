@@ -172,13 +172,15 @@ class ContextEntityRecall(MetricWithLLM):
         self,
         row: Dict,
         callbacks: Callbacks,
-    ) -> float:
+    ) -> t.Dict:
         ground_truth, contexts = row["ground_truth"], row["contexts"]
         ground_truth = await self.get_entities(ground_truth, callbacks=callbacks)
         contexts = await self.get_entities("\n".join(contexts), callbacks=callbacks)
         if ground_truth is None or contexts is None:
-            return np.nan
-        return self._compute_score(ground_truth.entities, contexts.entities)
+            return {"ground_truth is None or contexts is None": None}
+        score = self._compute_score(ground_truth.entities, contexts.entities)
+
+        return {"context_entity_recall": score}
 
     def save(self, cache_dir: str | None = None) -> None:
         return self.context_entity_recall_prompt.save(cache_dir)

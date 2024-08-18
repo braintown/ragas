@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import typing as t
+import re
 
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompt_values import PromptValue as BasePromptValue
@@ -277,7 +278,33 @@ class Prompt(BaseModel):
 
         cache_path = os.path.join(cache_dir, f"{self.name}.json")
         with open(cache_path, "w") as file:
-            json.dump(self.dict(), file, indent=4)
+            dic = self.dict()
+            # json_string = json.dumps(dic, ensure_ascii=False, indent=4)
+            print("origin",dic)
+            for example in dic['examples']:
+                # print("examples:",example)
+                # 移除example中的answer中的格式化字符
+                example['answer'] = example['answer'].replace('\n', '').replace(' ', '').replace('json', '').replace('```', '')
+                print('answer',example['answer'])
+            print("new",dic)
+            json.dump(dic, file, indent=4, ensure_ascii=False)
+
+    # def remove_backticks(self, json_string):
+    #     # Find all occurrences of ```json and ``` and replace them correctly
+    #     start_idx = 0
+    #     while True:
+    #         start_code_block = json_string.find('json', start_idx)
+    #         if start_code_block == -1:
+    #             break
+    #         end_code_block = json_string.find('```', start_code_block + 6)
+    #         if end_code_block == -1:
+    #             break
+    #         # Remove the backticks and 'json' keyword
+    #         json_string = (json_string[:start_code_block] +
+    #                        json_string[start_code_block + 6:end_code_block] +
+    #                        json_string[end_code_block + 3:])
+    #         start_idx = end_code_block + 3 - 6  # Adjust for removed characters
+    #     return json_string
 
     @classmethod
     def _load(cls, language: str, name: str, cache_dir: str) -> Prompt:
@@ -300,6 +327,12 @@ str_translation = Prompt(
             "input": "Who was queen Elizabeth and what is she best known for?",
             "output": "Wie was koningin Elizabeth en waar is zij het meest bekend om?",
         },
+        {
+            "translate_to": "chinese",
+            "input": "Who was queen Elizabeth and why is she best well-known for?",
+            "output": "女王 Elizabeth 是谁然后为什么她最出名？",
+        }
+
     ],
     input_keys=["translate_to", "input"],
     output_key="output",
@@ -337,6 +370,21 @@ json_translatation = Prompt(
                 "statements": [
                     "Parijs is de hoofdstad van Frankrijk.",
                     "Croissants zijn een populair Frans gebak.",
+                ]
+            },
+        },
+        {
+            "translate_to": "chinese",
+            "input": {
+                "statements": [
+                    "Paris is the capital of France.",
+                    "Croissants are a popular French pastry.",
+                ]
+            },
+            "output": {
+                "statements": [
+                    "巴黎是法国首都。",
+                    "Croissants 是法国最受欢迎的甜点。",
                 ]
             },
         },

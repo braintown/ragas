@@ -143,7 +143,7 @@ class ContextPrecision(MetricWithLLM):
         self: t.Self,
         row: t.Dict,
         callbacks: Callbacks,
-    ) -> float:
+    ) -> t.Dict:
         assert self.llm is not None, "LLM is not set"
 
         human_prompts = self._context_precision_prompt(row)
@@ -169,10 +169,13 @@ class ContextPrecision(MetricWithLLM):
             if agg_answer:
                 agg_answer = ContextPrecisionVerification.parse_obj(agg_answer[0])
             answers.append(agg_answer)
+        answer = [answer.dict() for answer in answers]
 
         answers = ContextPrecisionVerifications(__root__=answers)
         score = self._calculate_average_precision(answers.__root__)
-        return score
+
+
+        return {"context_precision_list": answer, "scores": score}
 
     def adapt(self, language: str, cache_dir: str | None = None) -> None:
         assert self.llm is not None, "LLM is not set"

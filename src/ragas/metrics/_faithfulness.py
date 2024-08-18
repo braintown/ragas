@@ -82,6 +82,51 @@ LONG_FORM_ANSWER_PROMPT = Prompt(
     output_key="analysis",
     language="english",
 )
+LONG_FORM_ANSWER_STATEMENTS_PROMPT = Prompt(
+    name="long_form_answer_statements",
+    output_format_instruction=_statements_output_instructions,
+    instruction="Given a question, an answer, and sentences from the answer analyze the complexity of each sentence given under 'sentences' and break down each sentence into one or more fully understandable statements while also ensuring no pronouns are used in each statement.After that, determine whether objective questions are indicated in the statements, and if they are indicated as subjective greetings, etc. delete that part of the statement. Format the outputs in JSON.",
+    examples=[
+        {
+            "question": "How effective are the heated and ventilated seats in the Aura on long drives?",
+            "answer": "The heated and ventilated seats in the IQ Aura are pretty great, keeping the seats at a comfortable temperature on both cold winter days and hot summer days. It works especially well on long drives and keeps you cozy the whole way. Do you have any other concerns about the rest of the driving experience?",
+            "sentences": """
+        0:The heated and ventilated seats in the IQ Aura are pretty great
+        1:keeping the seats at a comfortable temperature on both cold winter days and hot summer days
+        2:It works especially well on long drives and keeps you cozy the whole way
+        3:Do you have any other concerns about the rest of the driving experience?
+        """,
+            "analysis": StatementsAnswers.parse_obj(
+                [
+                    {
+                        "sentence_index": 0,
+                        "simpler_statements": [
+                            "The heated seats in the IQ Aura are pretty great ",
+                            "The ventilated seats in the IQ Aura are pretty great ",
+                        ],
+                    },
+                    {
+                        "sentence_index": 1,
+                        "simpler_statements": [
+                            "IQ Aura keeping the seats at a comfortable temperature on cold winter days",
+                            "IQ Aura keeping the seats at a comfortable temperature on hot summer days",
+                        ],
+                    },
+                    {
+                        "sentence_index": 2,
+                        "simpler_statements": [
+                            "IQ Aura works especially well on long drives ",
+                            "IQ Aura keeps you cozy the whole way",
+                        ],
+                    },
+                ]
+            ).dicts(),
+        }
+    ],
+    input_keys=["question", "answer", "sentences"],
+    output_key="analysis",
+    language="english",
+)
 
 
 class StatementFaithfulnessAnswer(BaseModel):
@@ -162,6 +207,64 @@ NLI_STATEMENTS_MESSAGE = Prompt(
     language="english",
 )  # noqa: E501
 
+NEW_NLI_STATEMENTS_MESSAGE = Prompt(
+    name="new_nli_statements",
+    instruction="您的任务是根据给定的上下文判断一系列语句的忠实性。对于每条语句，如果可以根据上下文直接推断出该语句，则必须返回 1；如果不能根据上下文直接推断出该语句，则必须返回 0。",
+    output_format_instruction=_faithfulness_output_instructions,
+    examples=[
+        {
+            "context": """约翰是 XYZ 大学的学生。他正在攻读计算机科学学位。本学期他选修了几门课程，包括数据结构、算法和数据库管理。约翰是个勤奋的学生，花了大量时间学习和完成作业。他经常在图书馆待到很晚，以完成他的项目。""",
+            "statements": [
+                "约翰主修生物学.",
+                "约翰正在学习人工智能课程.",
+                "约翰是一个敬业的学生。",
+                "约翰有一份兼职工作。",
+            ],
+            "answer": StatementFaithfulnessAnswers.parse_obj(
+                [
+                    {
+                        "statement": "约翰主修生物学.",
+                        "reason": "约翰的主修专业明确为计算机科学。没有任何信息表明他主修生物学。",
+                        "verdict": 0,
+                    },
+                    {
+                        "statement": "约翰正在学习人工智能课程..",
+                        "reason": "上下文提到了约翰目前正在学习的课程，但没有提到人工智能。因此，不能推断约翰正在学习人工智能课程。",
+                        "verdict": 0,
+                    },
+                    {
+                        "statement": "约翰是一个敬业的学生.",
+                        "reason": "上下文说他花了大量时间学习和完成作业。此外，上下文还提到他经常在图书馆工作到很晚，这意味着他很投入。",
+                        "verdict": 1,
+                    },
+                    {
+                        "statement": "约翰有一份兼职工作",
+                        "reason": "上下文中没有关于约翰有兼职工作的信息.",
+                        "verdict": 0,
+                    },
+                ]
+            ).dicts(),
+        },
+        {
+            "context": """光合作用是植物、藻类和某些细菌将光能转化为化学能的过程。""",
+            "statements": ["阿尔伯特-爱因斯坦是个天才。"],
+            "answer": StatementFaithfulnessAnswers.parse_obj(
+                [
+                    {
+                        "statement": "阿尔伯特-爱因斯坦是个天才。.",
+                        "reason": "上下文与陈述无关",
+                        "verdict": 0,
+                    }
+                ]
+            ).dicts(),
+        },
+    ],
+    input_keys=["context", "statements"],
+    output_key="answer",
+    output_type="json",
+    language="chinese",
+)  # noqa: E501
+
 
 @dataclass
 class Faithfulness(MetricWithLLM):
@@ -212,11 +315,12 @@ class Faithfulness(MetricWithLLM):
         assert self.sentence_segmenter is not None, "sentence_segmenter is not set"
 
         text, question = row["answer"], row["question"]
-        sentences = self.sentence_segmenter.segment(text)
-        sentences = [
-            sentence for sentence in sentences if sentence.strip().endswith(".")
-        ]
-        sentences = "\n".join([f"{i}:{x}" for i, x in enumerate(sentences)])
+        # sentences = self.sentence_segmenter.segment(text)
+        # sentences = [
+        #     sentence for sentence in sentences if sentence.strip().endswith(".")
+        # ]
+        # sentences = "\n".join([f"{i}:{x}" for i, x in enumerate(sentences)])
+        sentences = row["answer"]
         prompt_value = self.statement_prompt.format(
             question=question, answer=text, sentences=sentences
         )
@@ -236,7 +340,7 @@ class Faithfulness(MetricWithLLM):
 
         return score
 
-    async def _ascore(self: t.Self, row: t.Dict, callbacks: Callbacks) -> float:
+    async def _ascore(self: t.Self, row: t.Dict, callbacks: Callbacks) -> t.Dict:
         """
         returns the NLI score for each (q, c, a) pair
         """
@@ -252,7 +356,7 @@ class Faithfulness(MetricWithLLM):
         )
 
         if statements is None:
-            return np.nan
+            return {"faithfulness_list": [], "average_verdict": np.nan}
 
         statements = [item["simpler_statements"] for item in statements.dicts()]
         statements = [item for sublist in statements for item in sublist]
@@ -280,19 +384,29 @@ class Faithfulness(MetricWithLLM):
             faith.dicts() for faith in faithfulness_list if faith is not None
         ]
 
-        if faithfulness_list:
-            faithfulness_list = ensembler.from_discrete(
-                faithfulness_list,
-                "verdict",
-            )
+        # if faithfulness_list:
+        #     faithfulness_list = ensembler.from_discrete(
+        #         faithfulness_list,
+        #         "verdict",
+        #     )
+        #
+        #     faithfulness_list = StatementFaithfulnessAnswers.parse_obj(
+        #         faithfulness_list
+        #     )
+        # else:
+        #     return np.nan
 
-            faithfulness_list = StatementFaithfulnessAnswers.parse_obj(
-                faithfulness_list
-            )
+        verdicts = [item['verdict'] for sublist in faithfulness_list for item in sublist]
+
+        # 计算平均数
+        if verdicts:
+            average_verdict = sum(verdicts) / len(verdicts)
         else:
-            return np.nan
+            average_verdict = 0
 
-        return self._compute_score(faithfulness_list)
+        # print(f"result: {result}, type: {type(result)}")
+        # print(f"faithfulness_list:{ faithfulness_list}")
+        return {"faithfulness_list": faithfulness_list, "scores": float(average_verdict)}
 
     def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
         assert self.llm is not None, "LLM is not set"
@@ -306,7 +420,7 @@ class Faithfulness(MetricWithLLM):
             language, self.llm, cache_dir
         )
 
-        self.sentence_segmenter = get_segmenter(language=language, clean=False)
+        # self.sentence_segmenter = get_segmenter(language=language, clean=False)
 
     def save(self, cache_dir: t.Optional[str] = None) -> None:
         self.nli_statements_message.save(cache_dir)

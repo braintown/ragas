@@ -210,7 +210,7 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
         )
         return prompt_value
 
-    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
+    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> t.Dict:
         assert self.llm is not None, "LLM must be set"
 
         question = row["question"]
@@ -227,7 +227,7 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
             statements[item] = (
                 statements[item].dicts() if statements[item] is not None else []
             )
-
+        global answer
         if not all([val == [] for val in statements.values()]):
             ground_truth = [
                 statement
@@ -239,6 +239,7 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
                 for item in statements["answer"]
                 for statement in item["simpler_statements"]
             ]
+
             p_value = self.correctness_prompt.format(
                 question=question,
                 ground_truth=ground_truth,
@@ -271,7 +272,7 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
             weights=self.weights,
         )
 
-        return float(score)
+        return {"answer_correctness_list":answer,"scores":score }
 
     def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
         assert self.llm is not None, "llm must be set to compute score"
