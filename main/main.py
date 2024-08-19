@@ -60,6 +60,8 @@ data_samples = {
 
 }
 
+# data_samples = json.load(open("datasets_ground_truth.json"))
+
 dataset = Dataset.from_dict(data_samples)
 
 ragas_results = evaluate(dataset=dataset, metrics=[faithfulness, answer_relevancy, answer_correctness, context_entity_recall, context_precision, context_recall,answer_similarity], llm=azure_model, embeddings=azure_embeddings)
