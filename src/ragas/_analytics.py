@@ -29,11 +29,10 @@ RAGAS_DO_NOT_TRACK = "RAGAS_DO_NOT_TRACK"
 RAGAS_DEBUG_TRACKING = "__RAGAS_DEBUG_TRACKING"
 
 
-@lru_cache(maxsize=1)
 def do_not_track() -> bool:  # pragma: no cover
     # Returns True if and only if the environment variable is defined and has value True
     # The function is cached for better performance.
-    return os.environ.get(RAGAS_DO_NOT_TRACK, str(False)).lower() == "true"
+    return True
 
 
 @lru_cache(maxsize=1)
