@@ -107,6 +107,83 @@ TEXT_ENTITY_EXTRACTION = Prompt(
 )
 
 
+TEXT_ENTITY_EXTRACTION_NEW = Prompt(
+    name="text_entity_extraction_new",
+    instruction="""给定一段文本，提取唯一的实体，不重复。确保将同一实体的不同形式或提及视为单一实体。""",
+    input_keys=["text"],
+    output_key="output",
+    output_type="json",
+    output_format_instruction=_output_instructions,
+    examples=[
+        {
+            "text": """埃菲尔铁塔，位于法国巴黎，是全球最具标志性的地标之一。
+            每年都有数百万游客被它的城市美景所吸引。
+            它于1889年完工，正好赶上1889年的世界博览会。""",
+            "output": ContextEntitiesResponse.parse_obj(
+                {
+                    "entities": [
+                        "埃菲尔铁塔",
+                        "巴黎",
+                        "法国",
+                        "1889",
+                        "世界博览会",
+                    ],
+                }
+            ).dict(),
+        },
+        {
+            "text": """罗马的斗兽场，也被称为弗拉维安圆形剧场，作为罗马建筑和工程成就的纪念碑而矗立。
+            建设始于公元70年由皇帝韦斯帕西安开始，由他的儿子提图斯于公元80年完成。
+            它可以容纳5万到8万名观众观看角斗士比赛和公众表演。""",
+            "output": ContextEntitiesResponse.parse_obj(
+                {
+                    "entities": [
+                        "斗兽场",
+                        "罗马",
+                        "弗拉维安圆形剧场",
+                        "韦斯帕西安",
+                        "公元70年",
+                        "提图斯",
+                        "公元80年",
+                    ],
+                }
+            ).dict(),
+        },
+        {
+            "text": """中国的长城，从东到西绵延21,196公里，是古代防御建筑的奇迹。
+            为了防止来自北方的入侵，其建设早在公元前7世纪就开始了。
+            今天，它是联合国教科文组织世界遗产和主要旅游景点。""",
+            "output": ContextEntitiesResponse.parse_obj(
+                {
+                    "entities": [
+                        "长城",
+                        "21,196公里",
+                        "公元前7世纪",
+                        "联合国教科文组织世界遗产",
+                    ],
+                }
+            ).dict(),
+        },
+        {
+            "text": """阿波罗11号任务于1969年7月16日发射，标志着人类首次登月。
+            宇航员尼尔·阿姆斯特朗、巴兹·奥尔德林和迈克尔·柯林斯创造了历史，其中阿姆斯特朗成为第一个踏上月球表面的人。
+            这一事件是太空探索的一个重要里程碑。""",
+            "output": ContextEntitiesResponse.parse_obj(
+                {
+                    "entities": [
+                        "阿波罗11号任务",
+                        "1969年7月16日",
+                        "月球",
+                        "尼尔·阿姆斯特朗",
+                        "巴兹·奥尔德林",
+                        "迈克尔·柯林斯",
+                    ],
+                }
+            ).dict(),
+        },
+    ],
+)
+
 @dataclass
 class ContextEntityRecall(MetricWithLLM):
     """
@@ -133,7 +210,7 @@ class ContextEntityRecall(MetricWithLLM):
     name: str = "context_entity_recall"  # type: ignore
     evaluation_mode: EvaluationMode = EvaluationMode.gc  # type: ignore
     context_entity_recall_prompt: Prompt = field(
-        default_factory=lambda: TEXT_ENTITY_EXTRACTION
+        default_factory=lambda: TEXT_ENTITY_EXTRACTION_NEW
     )
     batch_size: int = 15
     max_retries: int = 1
@@ -157,7 +234,7 @@ class ContextEntityRecall(MetricWithLLM):
                                   f"ground_truth的列表为 ['凯迪拉克CT5', '全景天窗', '126色氛围灯'], contexts的列表为: ['全新CT5', '33英寸9K超视网膜曲面屏','Mini-LED', '126色设计师甄选氛围灯', '16扬声器AKG录音棚级音响'],"
                                   f"返回['凯迪拉克CT5', '126色氛围灯'], 不要返回['凯迪拉克CT5', '126色设计师甄选氛围灯']"
                                   f"知识补充：凯迪拉克傲歌和IQ傲歌为同一辆车型，凯迪拉克CT5和全新CT5为一辆车型"
-                          f"当列表没有相似的词组意思，返回空列表[]"}],
+                                  f"当列表没有相似的词组意思，返回空列表[]"}],
             "reply_constraints": {"sender_type": "BOT", "sender_name": "关键词"},
             "model": "abab6.5s-chat",
             "tokens_to_generate": 2048,
@@ -173,7 +250,18 @@ class ContextEntityRecall(MetricWithLLM):
             self, ground_truth_entities: t.Sequence[str], context_entities: t.Sequence[str]
     ) -> (float, list):
         similar_list = self.is_similar(ground_truth_entities, context_entities)
-        similar_list = ast.literal_eval(similar_list)
+        if type(similar_list) == str:
+            index= similar_list.find('[')
+            if index != -1:
+                try:
+                    similar_list = ast.literal_eval(similar_list)
+                except Exception as e:
+                    print(e)
+                    similar_list = []
+            else:
+                similar_list = []
+        else:
+            similar_list = []
         score = len(similar_list) / (len(ground_truth_entities) + 1e-8)
         return score, similar_list
 
@@ -211,8 +299,8 @@ class ContextEntityRecall(MetricWithLLM):
         if ground_truth is None or contexts is None:
             return {"ground_truth is None or contexts is None": None}
         score, intersecting_entities = self._compute_score(ground_truth.entities, contexts.entities)
-        context_entity_recall_list = [f"same_sequence:{intersecting_entities},contexts_entities:{contexts.entities},ground_truth_entities:{ground_truth.entities}"]
-
+        context_entity_recall_list = [
+            f"same_sequence:{intersecting_entities},contexts_entities:{contexts.entities},ground_truth_entities:{ground_truth.entities}"]
 
         return {"context_entity_recall_list": context_entity_recall_list, "scores": float(score)}
 
