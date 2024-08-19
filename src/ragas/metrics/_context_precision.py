@@ -72,6 +72,44 @@ CONTEXT_PRECISION = Prompt(
 )
 
 
+CONTEXT_PRECISION_NEW = Prompt(
+    name="context_precision_new",
+    instruction="""给定问题、答案和上下文，验证上下文在得出给定答案时是否有用。如果有用，给出判决为 "1"，如果无用，则为 "0"，并以 JSON 格式输出。""",
+    output_format_instruction=_verification_output_instructions,
+    examples=[
+        {
+            "question": """你能告诉我关于阿尔伯特·爱因斯坦的事情吗？""",
+            "context": """阿尔伯特·爱因斯坦（1879年3月14日 - 1955年4月18日）是一位出生于德国的理论物理学家，被广泛认为是有史以来最伟大和最有影响力的科学家之一。他最著名的是发展了相对论理论，同时也对量子力学做出了重要贡献，因此在二十世纪前几十年现代物理学重新塑造科学理解自然的过程中，他是一个核心人物。他的质能等效公式E=mc²，源自相对论理论，被称为“世界上最著名的方程”。他因“在理论物理学方面的贡献，特别是发现了光电效应法则”而获得了1921年的诺贝尔物理学奖，这是量子理论发展的一个关键步骤。他的工作也因其对科学哲学的影响而闻名。在1999年由英国杂志《物理世界》对全球130位领先物理学家进行的调查中，爱因斯坦被评为有史以来最伟大的物理学家。他的智力成就和原创性使爱因斯坦成为天才的代名词。""",
+            "answer": """阿尔伯特·爱因斯坦出生于1879年3月14日，是一位出生于德国的理论物理学家，被广泛认为是有史以来最伟大和最有影响力的科学家之一。他因在理论物理学方面的贡献而获得了1921年的诺贝尔物理学奖。他在1905年发表了4篇论文。爱因斯坦于1895年搬到瑞士。""",
+            "verification": ContextPrecisionVerification(
+                reason="提供的上下文在得出给定答案时确实有用。上下文包括关于阿尔伯特·爱因斯坦的生活和贡献的关键信息，这些信息在答案中得到了反映。",
+                verdict=1,
+            ).dict(),
+        },
+        {
+            "question": """谁赢得了2020年国际板球理事会世界杯？""",
+            "context": """2022年国际板球理事会男子T20世界杯于2022年10月16日至11月13日在澳大利亚举行，这是该赛事的第八届。原定于2020年举行，但由于COVID-19大流行而推迟。英格兰在决赛中击败巴基斯坦，以五个小门的优势胜出，赢得了他们的第二个国际板球理事会男子T20世界杯冠军。""",
+            "answer": """英格兰""",
+            "verification": ContextPrecisionVerification(
+                reason="上下文有助于澄清2020年国际板球理事会世界杯的情况，并指出英格兰是原定于2020年举行但实际上在2022年举行的比赛的冠军。",
+                verdict=1,
+            ).dict(),
+        },
+        {
+            "question": """世界上最高的山是什么？""",
+            "context": """安第斯山脉是世界上最长的大陆山脉，位于南美洲。它横跨七个国家，拥有西半球许多最高的山峰。该山脉以其多样的生态系统而闻名，包括高海拔的安第斯高原和亚马逊雨林。""",
+            "answer": """珠穆朗玛峰。""",
+            "verification": ContextPrecisionVerification(
+                reason="提供的上下文讨论了安第斯山脉，尽管令人印象深刻，但不包括珠穆朗玛峰，也不直接与关于世界上最高山峰的问题相关。",
+                verdict=0,
+            ).dict(),
+        },
+    ],
+    input_keys=["question", "context", "answer"],
+    output_key="verification",
+    output_type="json",
+)
+
 @dataclass
 class ContextPrecision(MetricWithLLM):
     """
@@ -87,7 +125,7 @@ class ContextPrecision(MetricWithLLM):
 
     name: str = "context_precision"  # type: ignore
     evaluation_mode: EvaluationMode = EvaluationMode.qcg  # type: ignore
-    context_precision_prompt: Prompt = field(default_factory=lambda: CONTEXT_PRECISION)
+    context_precision_prompt: Prompt = field(default_factory=lambda: CONTEXT_PRECISION_NEW)
     max_retries: int = 1
     _reproducibility: int = 1
 

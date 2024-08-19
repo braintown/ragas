@@ -4,6 +4,7 @@ import logging
 import typing as t
 from dataclasses import dataclass, field
 from typing import Dict
+import ast
 
 import numpy as np
 from langchain.pydantic_v1 import BaseModel
@@ -11,6 +12,7 @@ from langchain.pydantic_v1 import BaseModel
 from ragas.llms.output_parser import RagasoutputParser, get_json_format_instructions
 from ragas.llms.prompt import Prompt
 from ragas.metrics.base import EvaluationMode, MetricWithLLM
+import requests
 
 if t.TYPE_CHECKING:
     from langchain.callbacks.base import Callbacks
@@ -26,7 +28,6 @@ _output_instructions = get_json_format_instructions(
     pydantic_object=ContextEntitiesResponse
 )
 _output_parser = RagasoutputParser(pydantic_object=ContextEntitiesResponse)
-
 
 TEXT_ENTITY_EXTRACTION = Prompt(
     name="text_entity_extraction",
@@ -137,18 +138,49 @@ class ContextEntityRecall(MetricWithLLM):
     batch_size: int = 15
     max_retries: int = 1
 
+    @staticmethod
+    def is_similar(entity1: t.Sequence[str], entity2: t.Sequence[str]) -> str:
+        group_id = "1693463149758508"
+        api_key = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiLkuIrmtbfpm7fluqbnvZHnu5znp5HmioDmnInpmZDlhazlj7giLCJVc2VyTmFtZSI6IuaigeaeqyIsIkFjY291bnQiOiIiLCJTdWJqZWN0SUQiOiIxNjkzNDYzMTQ5ODMwNjAyIiwiUGhvbmUiOiIxNzY3NzMxMzE5NyIsIkdyb3VwSUQiOiIxNjkzNDYzMTQ5NzU4NTA4IiwiUGFnZU5hbWUiOiIiLCJNYWlsIjoiQUlSREBnZW1wb2xsLmNvbSIsIkNyZWF0ZVRpbWUiOiIyMDI0LTAxLTI0IDE5OjAzOjM4IiwiaXNzIjoibWluaW1heCJ9.tKy7T6gagvMp545jm2tOG42LbLm3SYFAQ4MlkXAMBlzYoeyy94VWls9ZFcVkPX9WFigvqsHyvlk6UIBpasOoQ3eKu5YopCYrO6j3eqNZdbUNVfUe1yDwNFLZN04Eu_sRfaa5uqYbqgFsl8k9kNleX4y9rh7fni-Hkx1e0LOnXWVVUbMcdChvpBuq_QhruodhFysxKvrWgV9PVqkaLS7Ym6N2J1w1TrhcH9yKZ6wyZi0GFvUknY0pld_E7B-Hn51G0ClM2fHGsMb7s5rb0NYWA_v4S1GsWB5-91mVzdfu3XPUPo9MJ4O_wZbf398HKsjd9cg52R1e-ho321RndNIvXw"
+        url = "https://api.minimax.chat/v1/text/chatcompletion_pro?GroupId=" + group_id
+        headers = {"Content-Type": "application/json", "Authorization": "Bearer " + api_key}
+
+        payload = {
+            "bot_setting": [
+                {
+                    "bot_name": "关键词",
+                    "content": "关键词帮助分析词组意思,能够理解各种词组之间的关联性",
+                }
+            ],
+            "messages": [{"sender_type": "USER", "sender_name": "小明",
+                          "text": f"判断以下两个列表是否具有相似的词组意思:\n1. {entity1}\n2. {entity2}\n.有的话提取出具体的词组列表,注意只返回第一个列表中的内容，不需要分析过程.例子如下："
+                                  f"ground_truth的列表为 ['凯迪拉克CT5', '全景天窗', '126色氛围灯'], contexts的列表为: ['全新CT5', '33英寸9K超视网膜曲面屏','Mini-LED', '126色设计师甄选氛围灯', '16扬声器AKG录音棚级音响'],"
+                                  f"返回['凯迪拉克CT5', '126色氛围灯'], 不要返回['凯迪拉克CT5', '126色设计师甄选氛围灯']"
+                                  f"知识补充：凯迪拉克傲歌和IQ傲歌为同一辆车型，凯迪拉克CT5和全新CT5为一辆车型"
+                          f"当列表没有相似的词组意思，返回空列表[]"}],
+            "reply_constraints": {"sender_type": "BOT", "sender_name": "关键词"},
+            "model": "abab6.5s-chat",
+            "tokens_to_generate": 2048,
+            "temperature": 0.01,
+            "top_p": 0.95,
+        }
+
+        response = requests.request("POST", url, headers=headers, json=payload)
+
+        return response.json()['reply']
+
     def _compute_score(
-        self, ground_truth_entities: t.Sequence[str], context_entities: t.Sequence[str]
-    ) -> float:
-        num_entities_in_both = len(
-            set(context_entities).intersection(set(ground_truth_entities))
-        )
-        return num_entities_in_both / (len(ground_truth_entities) + 1e-8)
+            self, ground_truth_entities: t.Sequence[str], context_entities: t.Sequence[str]
+    ) -> (float, list):
+        similar_list = self.is_similar(ground_truth_entities, context_entities)
+        similar_list = ast.literal_eval(similar_list)
+        score = len(similar_list) / (len(ground_truth_entities) + 1e-8)
+        return score, similar_list
 
     async def get_entities(
-        self,
-        text: str,
-        callbacks: Callbacks,
+            self,
+            text: str,
+            callbacks: Callbacks,
     ) -> t.Optional[ContextEntitiesResponse]:
         assert self.llm is not None, "LLM is not initialized"
         p_value = self.context_entity_recall_prompt.format(
@@ -169,18 +201,20 @@ class ContextEntityRecall(MetricWithLLM):
         return answer
 
     async def _ascore(
-        self,
-        row: Dict,
-        callbacks: Callbacks,
+            self,
+            row: Dict,
+            callbacks: Callbacks,
     ) -> t.Dict:
         ground_truth, contexts = row["ground_truth"], row["contexts"]
         ground_truth = await self.get_entities(ground_truth, callbacks=callbacks)
         contexts = await self.get_entities("\n".join(contexts), callbacks=callbacks)
         if ground_truth is None or contexts is None:
             return {"ground_truth is None or contexts is None": None}
-        score = self._compute_score(ground_truth.entities, contexts.entities)
+        score, intersecting_entities = self._compute_score(ground_truth.entities, contexts.entities)
+        context_entity_recall_list = [f"same_sequence:{intersecting_entities},contexts_entities:{contexts.entities},ground_truth_entities:{ground_truth.entities}"]
 
-        return {"context_entity_recall": score}
+
+        return {"context_entity_recall_list": context_entity_recall_list, "scores": float(score)}
 
     def save(self, cache_dir: str | None = None) -> None:
         return self.context_entity_recall_prompt.save(cache_dir)

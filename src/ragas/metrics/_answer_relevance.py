@@ -81,6 +81,57 @@ QUESTION_GEN = Prompt(
     output_type="json",
 )
 
+QUESTION_GEN_NEW = Prompt(
+    name="question_generation_new",
+    instruction="""为给定的答案生成一个问题，并确定答案是否是含糊其辞的。如果答案是含糊其辞的，给出 noncommittal 值为 1；如果答案是明确的，给出 noncommittal 值为 0。含糊其辞的答案是指回避的、模糊的或不明确的答案。例如，“我不知道”或“我不确定”都是含糊其辞的答案。""",
+    output_format_instruction=_output_instructions,
+    examples=[
+        {
+            "answer": """阿尔伯特·爱因斯坦出生在德国。""",
+            "context": """阿尔伯特·爱因斯坦是一位出生于德国的理论物理学家，被广泛认为是有史以来最伟大和最有影响力的科学家之一。""",
+            "output": AnswerRelevanceClassification.parse_obj(
+                {
+                    "question": "阿尔伯特·爱因斯坦出生在哪里？",
+                    "noncommittal": 0,
+                }
+            ).dict(),
+        },
+        {
+            "answer": """它可以根据环境温度改变皮肤颜色。""",
+            "context": """最近的一项科学研究在亚马逊雨林中发现了一种新物种的青蛙，这种青蛙具有根据环境温度改变皮肤颜色的独特能力。""",
+            "output": AnswerRelevanceClassification.parse_obj(
+                {
+                    "question": "新发现的青蛙物种具有什么独特的能力？",
+                    "noncommittal": 0,
+                }
+            ).dict(),
+        },
+        {
+            "answer": """珠穆朗玛峰""",
+            "context": """地球上从海平面测量的最高山峰是位于喜马拉雅山脉的一座著名山峰。""",
+            "output": AnswerRelevanceClassification.parse_obj(
+                {
+                    "question": "地球上最高的山峰是什么？",
+                    "noncommittal": 0,
+                }
+            ).dict(),
+        },
+        {
+            "answer": """我不知道 2023 年发明的智能手机的突破性功能，因为我不了解 2022 年之后的信息。""",
+            "context": """2023 年，一项突破性的发明被宣布：一种电池寿命为一个月的智能手机，彻底改变了人们使用移动技术的方式。""",
+            "output": AnswerRelevanceClassification.parse_obj(
+                {
+                    "question": "2023 年发明的智能手机的突破性功能是什么？",
+                    "noncommittal": 1,
+                }
+            ).dict(),
+        },
+    ],
+    input_keys=["answer", "context"],
+    output_key="output",
+    output_type="json",
+)
+
 
 @dataclass
 class AnswerRelevancy(MetricWithLLM, MetricWithEmbeddings):
@@ -103,7 +154,7 @@ class AnswerRelevancy(MetricWithLLM, MetricWithEmbeddings):
 
     name: str = "answer_relevancy"  # type: ignore
     evaluation_mode: EvaluationMode = EvaluationMode.qac  # type: ignore
-    question_generation: Prompt = field(default_factory=lambda: QUESTION_GEN)
+    question_generation: Prompt = field(default_factory=lambda: QUESTION_GEN_NEW)
     strictness: int = 3
 
     def calculate_similarity(

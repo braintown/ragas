@@ -5,39 +5,33 @@ import json
 
 from langchain_openai import AzureChatOpenAI
 from langchain_openai.embeddings import AzureOpenAIEmbeddings
-
+from langchain_openai import ChatOpenAI
 from ragas.metrics import faithfulness, answer_relevancy, answer_correctness, context_entity_recall, context_precision, \
     context_recall,answer_similarity
 from ragas import adapt
 
-
-# context_entity_recall 备选，内容还没确认
-os.environ["AZURE_OPENAI_API_KEY"] = "aa34c68036574cef8c9490d3fe9d4cd3"
+os.environ["AZURE_OPENAI_API_KEY"] = ""
 azure_configs = {
-    "base_url": "https://aigc-dev-gempoll.openai.azure.com/",
+    "base_url": "",
     "model_deployment": "gpt4o",
     "model_name": "gpt4o",
     "embedding_deployment": "embedding-large",
     "embedding_name": "embedding-large",  # most likely
 }
 azure_model = AzureChatOpenAI(
-    openai_api_version="2024-06-01",
+    openai_api_version="",
     azure_endpoint=azure_configs["base_url"],
     azure_deployment=azure_configs["model_deployment"],
     model=azure_configs["model_name"],
     validate_base_url=False,
 )
 azure_embeddings = AzureOpenAIEmbeddings(
-    openai_api_version="2024-06-01",
+    openai_api_version="",
     azure_endpoint=azure_configs["base_url"],
     azure_deployment=azure_configs["embedding_deployment"],
     model=azure_configs["embedding_name"],
 )
 
-# faithfulness.llm = azure_model
-# faithfulness.adapt(language="Chinese")
-# adapt(metrics=[faithfulness], language="chinese", llm=azure_model,)
-#
 data_samples = {
     "question": [
         "全新CT5在长途驾驶时的座椅舒适性如何？",
@@ -68,6 +62,5 @@ data_samples = {
 
 dataset = Dataset.from_dict(data_samples)
 
-ragas_results = evaluate(dataset=dataset, metrics=[answer_similarity], llm=azure_model, embeddings=azure_embeddings)
-#
+ragas_results = evaluate(dataset=dataset, metrics=[faithfulness, answer_relevancy, answer_correctness, context_entity_recall, context_precision, context_recall,answer_similarity], llm=azure_model, embeddings=azure_embeddings)
 print(ragas_results)

@@ -85,38 +85,38 @@ LONG_FORM_ANSWER_PROMPT = Prompt(
 LONG_FORM_ANSWER_STATEMENTS_PROMPT = Prompt(
     name="long_form_answer_statements",
     output_format_instruction=_statements_output_instructions,
-    instruction="Given a question, an answer, and sentences from the answer analyze the complexity of each sentence given under 'sentences' and break down each sentence into one or more fully understandable statements while also ensuring no pronouns are used in each statement.After that, determine whether objective questions are indicated in the statements, and if they are indicated as subjective greetings, etc. delete that part of the statement. Format the outputs in JSON.",
+    instruction="给定一个问题、一个答案和答案中的句子，分析“句子”下的每个句子的复杂性，并将每个句子分解为一个或多个完全可理解的陈述，同时确保每个陈述中不使用代词。之后，确定陈述中是否指出了客观问题，如果它们被指示为主观问候等，则删除该部分陈述。以 JSON 格式输出。",
     examples=[
         {
-            "question": "How effective are the heated and ventilated seats in the Aura on long drives?",
-            "answer": "The heated and ventilated seats in the IQ Aura are pretty great, keeping the seats at a comfortable temperature on both cold winter days and hot summer days. It works especially well on long drives and keeps you cozy the whole way. Do you have any other concerns about the rest of the driving experience?",
+            "question": "Aura 的加热和通风座椅在长途驾驶中效果如何？",
+            "answer": "IQ Aura 的加热和通风座椅非常棒，无论是寒冷的冬天还是炎热的夏天，都能保持座椅在舒适的温度。它在长途驾驶中尤其有效，让你一路舒适。你对驾驶体验的其他方面还有什么疑虑吗？",
             "sentences": """
-        0:The heated and ventilated seats in the IQ Aura are pretty great
-        1:keeping the seats at a comfortable temperature on both cold winter days and hot summer days
-        2:It works especially well on long drives and keeps you cozy the whole way
-        3:Do you have any other concerns about the rest of the driving experience?
+        0:IQ Aura 的加热和通风座椅非常棒
+        1:在寒冷的冬天和炎热的夏天都能保持座椅在舒适的温度
+        2:它在长途驾驶中尤其有效，让你一路舒适
+        3:你对驾驶体验的其他方面还有什么疑虑吗？
         """,
             "analysis": StatementsAnswers.parse_obj(
                 [
                     {
                         "sentence_index": 0,
                         "simpler_statements": [
-                            "The heated seats in the IQ Aura are pretty great ",
-                            "The ventilated seats in the IQ Aura are pretty great ",
+                            "IQ Aura 的加热座椅非常棒",
+                            "IQ Aura 的通风座椅非常棒",
                         ],
                     },
                     {
                         "sentence_index": 1,
                         "simpler_statements": [
-                            "IQ Aura keeping the seats at a comfortable temperature on cold winter days",
-                            "IQ Aura keeping the seats at a comfortable temperature on hot summer days",
+                            "IQ Aura 在寒冷的冬天保持座椅在舒适的温度",
+                            "IQ Aura 在炎热的夏天保持座椅在舒适的温度",
                         ],
                     },
                     {
                         "sentence_index": 2,
                         "simpler_statements": [
-                            "IQ Aura works especially well on long drives ",
-                            "IQ Aura keeps you cozy the whole way",
+                            "IQ Aura 在长途驾驶中尤其有效",
+                            "IQ Aura 让你一路舒适",
                         ],
                     },
                 ]
@@ -125,7 +125,7 @@ LONG_FORM_ANSWER_STATEMENTS_PROMPT = Prompt(
     ],
     input_keys=["question", "answer", "sentences"],
     output_key="analysis",
-    language="english",
+    language="chinese",
 )
 
 
@@ -271,9 +271,9 @@ class Faithfulness(MetricWithLLM):
     name: str = "faithfulness"  # type: ignore
     evaluation_mode: EvaluationMode = EvaluationMode.qac  # type: ignore
     nli_statements_message: Prompt = field(
-        default_factory=lambda: NLI_STATEMENTS_MESSAGE
+        default_factory=lambda: NEW_NLI_STATEMENTS_MESSAGE
     )
-    statement_prompt: Prompt = field(default_factory=lambda: LONG_FORM_ANSWER_PROMPT)
+    statement_prompt: Prompt = field(default_factory=lambda: LONG_FORM_ANSWER_STATEMENTS_PROMPT)
     sentence_segmenter: t.Optional[HasSegmentMethod] = None
     max_retries: int = 1
     _reproducibility: int = 1

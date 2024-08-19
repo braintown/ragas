@@ -11,7 +11,7 @@ from ragas.llms.output_parser import RagasoutputParser, get_json_format_instruct
 from ragas.llms.prompt import Prompt, PromptValue
 from ragas.metrics._answer_similarity import AnswerSimilarity
 from ragas.metrics._faithfulness import (
-    LONG_FORM_ANSWER_PROMPT,
+    LONG_FORM_ANSWER_STATEMENTS_PROMPT,
     HasSegmentMethod,
     _statements_output_parser,
 )
@@ -48,6 +48,17 @@ Given a ground truth and an answer statements, analyze each statement and classi
 
 Each statement can only belong to one of the categories. Provide a reason for each classification.
 """
+
+CORRECTNESS_INSTRUCTIONS_NEW = """\
+给定一个地面事实和一个答案陈述，分析每个陈述并将其分类为以下类别之一：
+
+- TP（真正的正例）：在答案中存在的陈述也直接得到地面事实中的一个或多个陈述的支持，
+- FP（错误的正例）：答案中存在的陈述但没有直接得到地面事实中的任何陈述的支持，
+- FN（漏报的负例）：在地面事实中找到但在答案中不存在的陈述。
+
+每个陈述只能属于其中一个类别。请为每个分类提供理由。
+"""
+
 CORRECTNESS_PROMPT = Prompt(
     name="answer_correctness",
     instruction=CORRECTNESS_INSTRUCTIONS,
@@ -139,6 +150,96 @@ CORRECTNESS_PROMPT = Prompt(
 )
 
 
+CORRECTNESS_PROMPT_NEW = Prompt(
+    name="answer_correctness_new",
+    instruction=CORRECTNESS_INSTRUCTIONS_NEW,
+    output_format_instruction=_output_instructions,
+    examples=[
+        {
+            "question": """是什么为太阳提供能量，它的主要功能是什么？""",
+            "answer": [
+                "太阳由核裂变提供能量，类似于地球上的核反应堆。",
+                "太阳的主要功能是为太阳系提供光。",
+            ],
+            "ground_truth": [
+                "太阳由核聚变提供能量，其中氢原子聚变形成氦。",
+                "太阳核心的这种聚变过程释放出大量的能量。",
+                "来自太阳的能量提供了热量和光，这对地球上的生命至关重要。",
+                "太阳的光在地球的气候系统中起着关键作用。",
+                "阳光有助于驱动天气和海洋洋流。",
+            ],
+            "classification": AnswerCorrectnessClassification.parse_obj(
+                {
+                    "TP": [
+                        {
+                            "statement": "太阳的主要功能是为太阳系提供光。",
+                            "reason": "这一陈述在一定程度上得到了地面事实的支持，地面事实提到了太阳提供光及其作用，尽管它更广泛地关注太阳的能量。",
+                        }
+                    ],
+                    "FP": [
+                        {
+                            "statement": "太阳由核裂变提供能量，类似于地球上的核反应堆。",
+                            "reason": "这一陈述是不正确的，与地面事实相矛盾，地面事实指出太阳由核聚变提供能量。",
+                        }
+                    ],
+                    "FN": [
+                        {
+                            "statement": "太阳由核聚变提供能量，其中氢原子聚变形成氦。",
+                            "reason": "这一对太阳能量来源的准确描述没有包含在答案中。",
+                        },
+                        {
+                            "statement": "太阳核心的这种聚变过程释放出大量的能量。",
+                            "reason": "这一过程及其重要性在答案中没有提到。",
+                        },
+                        {
+                            "statement": "来自太阳的能量提供了热量和光，这对地球上的生命至关重要。",
+                            "reason": "答案中只提到了光，而省略了热量及其对生命的必要性，这在地面事实中有所涵盖。",
+                        },
+                        {
+                            "statement": "太阳的光在地球的气候系统中起着关键作用。",
+                            "reason": "太阳光对地球气候系统的广泛影响在答案中没有涉及。",
+                        },
+                        {
+                            "statement": "阳光有助于驱动天气和海洋洋流。",
+                            "reason": "答案中省略了阳光对天气模式和海洋洋流的影响。",
+                        },
+                    ],
+                }
+            ).dict(),
+        },
+        {
+            "question": """水的沸点是多少？""",
+            "answer": [
+                "水的沸点是100摄氏度，在海平面上。"
+            ],
+            "ground_truth": [
+                "水的沸点是100摄氏度（212华氏度），在海平面上。",
+                "水的沸点会随海拔高度变化。",
+            ],
+            "classification": AnswerCorrectnessClassification.parse_obj(
+                {
+                    "TP": [
+                        {
+                            "statement": "水的沸点是100摄氏度，在海平面上。",
+                            "reason": "这一陈述直接得到了地面事实的支持，地面事实明确指出水的沸点在海平面上是100摄氏度。",
+                        }
+                    ],
+                    "FP": [],
+                    "FN": [
+                        {
+                            "statement": "水的沸点会随海拔高度变化。",
+                            "reason": "这一关于水的沸点会随海拔高度变化的额外信息在答案中没有提到。",
+                        }
+                    ],
+                }
+            ).dict(),
+        },
+    ],
+    input_keys=["question", "answer", "ground_truth"],
+    output_key="classification",
+    output_type="json",
+)
+
 @dataclass
 class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
     """
@@ -158,9 +259,9 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings):
 
     name: str = "answer_correctness"  # type: ignore[reportIncompatibleMethodOverride]
     evaluation_mode: EvaluationMode = EvaluationMode.qga  # type: ignore[reportIncompatibleMethodOverride]
-    correctness_prompt: Prompt = field(default_factory=lambda: CORRECTNESS_PROMPT)
+    correctness_prompt: Prompt = field(default_factory=lambda: CORRECTNESS_PROMPT_NEW)
     long_form_answer_prompt: Prompt = field(
-        default_factory=lambda: LONG_FORM_ANSWER_PROMPT
+        default_factory=lambda: LONG_FORM_ANSWER_STATEMENTS_PROMPT
     )
     weights: list[float] = field(default_factory=lambda: [0.75, 0.25])
     answer_similarity: t.Optional[AnswerSimilarity] = None

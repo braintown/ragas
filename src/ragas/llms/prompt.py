@@ -280,13 +280,13 @@ class Prompt(BaseModel):
         with open(cache_path, "w") as file:
             dic = self.dict()
             # json_string = json.dumps(dic, ensure_ascii=False, indent=4)
-            print("origin",dic)
-            for example in dic['examples']:
-                # print("examples:",example)
-                # 移除example中的answer中的格式化字符
-                example['answer'] = example['answer'].replace('\n', '').replace(' ', '').replace('json', '').replace('```', '')
-                print('answer',example['answer'])
-            print("new",dic)
+            # print("origin",dic)
+            # for example in dic['examples']:
+            #     # print("examples:",example)
+            #     # 移除example中的answer中的格式化字符
+            #     example['answer'] = example['answer'].replace('\n', '').replace(' ', '').replace('json', '').replace('```', '')
+            #     print('answer',example['answer'])
+            # print("new",dic)
             json.dump(dic, file, indent=4, ensure_ascii=False)
 
     # def remove_backticks(self, json_string):
