@@ -283,8 +283,8 @@ def evaluate(
                     s[f"{m.name}_scores"] = result["scores"]
                 elif m.name == "context_entity_recall":
                     s[f"{m.name}_list"] = result["context_entity_recall_list"]
-                    # print(type(result["context_entity_recall_list"]))
-                    # print(type(s[f"{m.name}_list"]))
+                    s[f"{m.name}_scores"] = result["scores"]
+                elif m.name == "answer_similarity":
                     s[f"{m.name}_scores"] = result["scores"]
 
                 else:
