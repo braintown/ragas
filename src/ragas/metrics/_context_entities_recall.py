@@ -5,6 +5,8 @@ import typing as t
 from dataclasses import dataclass, field
 from typing import Dict
 import ast
+import os
+from openai import AzureOpenAI
 
 import numpy as np
 from langchain.pydantic_v1 import BaseModel
@@ -217,34 +219,31 @@ class ContextEntityRecall(MetricWithLLM):
 
     @staticmethod
     def is_similar(entity1: t.Sequence[str], entity2: t.Sequence[str]) -> str:
-        group_id = "1693463149758508"
-        api_key = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiLkuIrmtbfpm7fluqbnvZHnu5znp5HmioDmnInpmZDlhazlj7giLCJVc2VyTmFtZSI6IuaigeaeqyIsIkFjY291bnQiOiIiLCJTdWJqZWN0SUQiOiIxNjkzNDYzMTQ5ODMwNjAyIiwiUGhvbmUiOiIxNzY3NzMxMzE5NyIsIkdyb3VwSUQiOiIxNjkzNDYzMTQ5NzU4NTA4IiwiUGFnZU5hbWUiOiIiLCJNYWlsIjoiQUlSREBnZW1wb2xsLmNvbSIsIkNyZWF0ZVRpbWUiOiIyMDI0LTAxLTI0IDE5OjAzOjM4IiwiaXNzIjoibWluaW1heCJ9.tKy7T6gagvMp545jm2tOG42LbLm3SYFAQ4MlkXAMBlzYoeyy94VWls9ZFcVkPX9WFigvqsHyvlk6UIBpasOoQ3eKu5YopCYrO6j3eqNZdbUNVfUe1yDwNFLZN04Eu_sRfaa5uqYbqgFsl8k9kNleX4y9rh7fni-Hkx1e0LOnXWVVUbMcdChvpBuq_QhruodhFysxKvrWgV9PVqkaLS7Ym6N2J1w1TrhcH9yKZ6wyZi0GFvUknY0pld_E7B-Hn51G0ClM2fHGsMb7s5rb0NYWA_v4S1GsWB5-91mVzdfu3XPUPo9MJ4O_wZbf398HKsjd9cg52R1e-ho321RndNIvXw"
-        url = "https://api.minimax.chat/v1/text/chatcompletion_pro?GroupId=" + group_id
-        headers = {"Content-Type": "application/json", "Authorization": "Bearer " + api_key}
+        os.environ["AZURE_OPENAI_ENDPOINT"] = "https://aigc-dev-gempoll.openai.azure.com/"
+    os.environ["AZURE_OPENAI_API_KEY"] = "aa34c68036574cef8c9490d3fe9d4cd3"
+    @staticmethod
+    def is_similar(entity1: t.Sequence[str], entity2: t.Sequence[str]) -> str:
 
-        payload = {
-            "bot_setting": [
-                {
-                    "bot_name": "关键词",
-                    "content": "关键词帮助分析词组意思,能够理解各种词组之间的关联性",
-                }
-            ],
-            "messages": [{"sender_type": "USER", "sender_name": "小明",
-                          "text": f"判断以下两个列表是否具有相似的词组意思:\n1. {entity1}\n2. {entity2}\n.有的话提取出具体的词组列表,注意只返回第一个列表中的内容，不需要分析过程.例子如下："
-                                  f"ground_truth的列表为 ['凯迪拉克CT5', '全景天窗', '126色氛围灯'], contexts的列表为: ['全新CT5', '33英寸9K超视网膜曲面屏','Mini-LED', '126色设计师甄选氛围灯', '16扬声器AKG录音棚级音响'],"
-                                  f"返回['凯迪拉克CT5', '126色氛围灯'], 不要返回['凯迪拉克CT5', '126色设计师甄选氛围灯']"
-                                  f"知识补充：凯迪拉克傲歌和IQ傲歌为同一辆车型，凯迪拉克CT5和全新CT5为一辆车型"
-                          f"当列表没有相似的词组意思，返回空列表[]"}],
-            "reply_constraints": {"sender_type": "BOT", "sender_name": "关键词"},
-            "model": "abab6.5s-chat",
-            "tokens_to_generate": 2048,
-            "temperature": 0.01,
-            "top_p": 0.95,
-        }
+        client = AzureOpenAI(
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            api_version="2024-06-01"
+        )
+        response = client.chat.completions.create(
+            model="gpt4o",  # model = "deployment_name".
+            messages=[
+                {"role": "system", "content": "你需要帮助分析词组意思,并能够理解各种词组之间的关联性"},
+                {"role": "user",
+                 "content": f"判断以下两个列表是否具有相似的词组意思:\n1. {entity1}\n2. {entity2}\n.有的话提取出具体的词组列表,注意只返回第一个列表中的内容，不需要分析过程.例子如下："
+                            f"ground_truth的列表为 ['凯迪拉克CT5', '全景天窗', '126色氛围灯'], contexts的列表为: ['全新CT5', '33英寸9K超视网膜曲面屏','Mini-LED', '126色设计师甄选氛围灯', '16扬声器AKG录音棚级音响'],"
+                            f"返回['凯迪拉克CT5', '126色氛围灯'], 不要返回['凯迪拉克CT5', '126色设计师甄选氛围灯']"
+                            f"知识补充：凯迪拉克傲歌和IQ傲歌为同一辆车型，凯迪拉克CT5和全新CT5为一辆车型"
+                            f"当列表没有相似的词组意思，返回空列表[],不要给出分析过程，直接给出结果列表即可"},
+            ]
+        )
 
-        response = requests.request("POST", url, headers=headers, json=payload)
-
-        return response.json()['reply']
+        # print(response.choices[0].message.content)
+        return response.choices[0].message.content
 
     def _compute_score(
             self, ground_truth_entities: t.Sequence[str], context_entities: t.Sequence[str]
