@@ -49,7 +49,7 @@ class AnswerSimilarity(MetricWithLLM, MetricWithEmbeddings):
                 **self.embeddings.encode_kwargs,
             }
 
-    async def _ascore(self: t.Self, row: t.Dict, callbacks: Callbacks) -> float:
+    async def _ascore(self: t.Self, row: t.Dict, callbacks: Callbacks) -> t.Dict:
         assert self.embeddings is not None, "embeddings must be set"
 
         ground_truth = t.cast(str, row["ground_truth"])
@@ -74,7 +74,7 @@ class AnswerSimilarity(MetricWithLLM, MetricWithEmbeddings):
         if self.threshold:
             score = score >= self.threshold
 
-        return score.tolist()[0]
+        return {"scores": score.tolist()[0]}
 
 
 answer_similarity = AnswerSimilarity()
