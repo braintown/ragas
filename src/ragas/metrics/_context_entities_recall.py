@@ -217,9 +217,7 @@ class ContextEntityRecall(MetricWithLLM):
     batch_size: int = 15
     max_retries: int = 1
 
-    @staticmethod
-    def is_similar(entity1: t.Sequence[str], entity2: t.Sequence[str]) -> str:
-        os.environ["AZURE_OPENAI_ENDPOINT"] = "https://aigc-dev-gempoll.openai.azure.com/"
+    os.environ["AZURE_OPENAI_ENDPOINT"] = "https://aigc-dev-gempoll.openai.azure.com/"
     os.environ["AZURE_OPENAI_API_KEY"] = "aa34c68036574cef8c9490d3fe9d4cd3"
     @staticmethod
     def is_similar(entity1: t.Sequence[str], entity2: t.Sequence[str]) -> str:
