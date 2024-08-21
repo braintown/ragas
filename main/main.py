@@ -32,6 +32,7 @@ azure_embeddings = AzureOpenAIEmbeddings(
     model=azure_configs["embedding_name"],
 )
 
+
 data_samples = {
     "question": [
         "全新CT5在长途驾驶时的座椅舒适性如何？",
