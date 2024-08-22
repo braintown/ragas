@@ -10,9 +10,9 @@ from ragas.metrics import faithfulness, answer_relevancy, answer_correctness, co
     context_recall,answer_similarity
 from ragas import adapt
 
-os.environ["AZURE_OPENAI_API_KEY"] = "aa34c68036574cef8c9490d3fe9d4cd3"
+os.environ["AZURE_OPENAI_API_KEY"] = ""
 azure_configs = {
-    "base_url": "https://aigc-dev-gempoll.openai.azure.com/",
+    "base_url": "",
     "model_deployment": "gpt4o",
     "model_name": "gpt4o",
     "embedding_deployment": "embedding-large",
